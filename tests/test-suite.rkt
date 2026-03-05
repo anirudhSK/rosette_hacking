@@ -7,6 +7,9 @@
 
 (require rackunit
          rackunit/text-ui
+         (only-in rackunit/private/check-info
+                  pretty-info? pretty-info-value
+                  verbose-info? verbose-info-value)
          "../yosys-rtlil.rkt"
          "../yosys-cells.rkt"
          "../yosys-interpreter.rkt")
@@ -429,12 +432,52 @@
        (check-equal? (modulo (- av bv-val) 256) 42)))))
 
 ;; ------------------------------------------------------------
-;; Run all suites
+;; Verbose test runner: prints every test name and PASS/FAIL status.
+;; Returns the number of failures (0 = all passed).
 ;; ------------------------------------------------------------
 
+;; Format a single check-info entry from a rackunit failure.
+(define (format-check-info ci)
+  (define v (check-info-value ci))
+  (define vs (cond
+    [(pretty-info? v)  (format "~s" (pretty-info-value v))]
+    [(verbose-info? v) (format "~s" (verbose-info-value v))]
+    [else              (format "~s" v)]))
+  (format "      ~a: ~a" (check-info-name ci) vs))
+
+(define (run-suite/verbose suite)
+  (define sname (rackunit-test-suite-name suite))
+  (printf "\n~a\n~a\n" sname (make-string (string-length sname) #\-))
+  (define failures
+    (fold-test-results
+     (lambda (result acc)
+       (define tname (or (test-result-test-case-name result) "<unnamed>"))
+       (cond
+         [(test-success? result)
+          (printf "  PASS  ~a\n" tname)]
+         [(test-failure? result)
+          (printf "  FAIL  ~a\n" tname)
+          (for-each (lambda (ci) (displayln (format-check-info ci)))
+                    (exn:test:check-stack (test-failure-result result)))]
+         [(test-error? result)
+          (printf "  ERROR ~a\n      ~a\n" tname
+                  (exn-message (test-error-result result)))])
+       (if (test-success? result) acc (+ acc 1)))
+     0
+     suite))
+  (printf "~a\n" (if (zero? failures)
+                     "All tests passed."
+                     (format "~a test(s) FAILED." failures)))
+  failures)
+
 (define (run-all-tests)
-  (run-tests concrete-tests)
-  (run-tests sequential-tests)
-  (run-tests symbolic-tests))
+  (define total-failures
+    (+ (run-suite/verbose concrete-tests)
+       (run-suite/verbose sequential-tests)
+       (run-suite/verbose symbolic-tests)))
+  (printf "\n~a\n" (if (zero? total-failures)
+                       "=== All suites passed ==="
+                       (format "=== ~a failure(s) total ===" total-failures)))
+  total-failures)
 
 (run-all-tests)
