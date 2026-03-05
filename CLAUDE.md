@@ -27,7 +27,7 @@ The CI workflow runs on every push and pull request. It installs Racket 8.14 (CS
 All signal values are Rosette **bitvectors** of a declared width. A signal reference (`signal-ref`) is one of:
 - A `symbol` — wire name looked up in the environment `hash[symbol → bv]`
 - A `const` struct — literal integer with explicit width, converted via `const->bv`
-- A raw `bv` — already resolved
+- A raw `bv` — Rosette-specific convenience; does not exist in real RTLIL. Allows a bitvector (concrete or symbolic) to be embedded directly in a cell's inputs without routing through a named wire. `resolve-signal` just passes it through.
 
 ### Cell Evaluation (`yosys-cells.rkt`)
 `eval-cell : cell × env → hash[port-name → bv]`
@@ -45,6 +45,7 @@ Key conventions matching Yosys semantics:
 - **Topological sort**: combinational cells are ordered so every cell's inputs are resolved before it runs. Detects combinational loops.
 - **Sequential split**: `$dff` and friends are separated from combinational cells. Their `Q` outputs are seeded from a `state` hash before combinational evaluation; their `D` inputs are sampled after to produce the next state.
 - **Clock abstraction**: clock signals are not modeled; one call to `step-module` = one clock edge.
+- **`step-module` evaluation order**: combinational logic is evaluated twice per cycle — once with current state to find DFF D inputs (`pre-env`), then once with the new state after the clock edge (`post-env`). Outputs are read from `post-env`. This is an implementation artifact of separating combinational and sequential cells, not a named technique. The design choice it reflects is standard RTL simulation convention: outputs are observed after DFFs have updated.
 
 ### Public API
 
