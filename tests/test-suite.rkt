@@ -357,7 +357,7 @@
        (bvand (evaluate A8sym sol) (evaluate B8sym sol)))
       #xFF))
 
-   (test-case "solve: A AND 0 = 0 always (no solution for Y=1 with B=0)"
+   (test-case "solve: no A satisfies A AND 0 = 1 (unsat)"
      (define-symbolic A8z (bitvector 8))
      (define result (eval-module and8-mod (hash 'A A8z 'B (bv 0 8))))
      (define sol (solve (assert (bveq (hash-ref result 'Y) (bv 1 8)))))
