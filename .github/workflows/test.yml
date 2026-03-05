@@ -1,0 +1,38 @@
+name: Test
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  test:
+    name: Rosette test suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Racket
+        uses: Bogdanp/setup-racket@v1.11
+        with:
+          architecture: x64
+          distribution: full
+          variant: CS
+          version: "8.14"
+
+      - name: Cache Racket packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.racket
+          key: racket-8.14-rosette-${{ hashFiles('**/*.rkt') }}
+          restore-keys: |
+            racket-8.14-rosette-
+
+      - name: Install Rosette
+        run: raco pkg install --auto --batch rosette
+
+      - name: Run tests
+        run: raco test tests/test-suite.rkt
