@@ -35,4 +35,6 @@ jobs:
         run: raco pkg install --auto --batch rosette
 
       - name: Run tests
-        run: raco test tests/test-suite.rkt
+        run: |
+          raco test tests/test-suite.rkt
+          raco test tests/test-tiny-cpu.rkt
