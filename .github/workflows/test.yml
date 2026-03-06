@@ -38,3 +38,4 @@ jobs:
         run: |
           raco test tests/test-suite.rkt
           raco test tests/test-tiny-cpu.rkt
+          raco test tests/test-tiny-cpu-rtlil.rkt

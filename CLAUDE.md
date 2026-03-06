@@ -9,17 +9,25 @@ A reference interpreter for Yosys RTLIL (Register Transfer Level Intermediate La
 | `yosys-rtlil.rkt` | Core data structures: wires, ports, cells, modules |
 | `yosys-cells.rkt` | Cell semantics: `eval-cell` and helpers |
 | `yosys-interpreter.rkt` | Module evaluator: topological sort, step/run functions |
+| `yosys-json.rkt` | Bit-level evaluator for Yosys JSON output; `load-json-module`, `json-cpu-run` |
+| `tiny_cpu.v` | Minimal 8-bit RISC CPU in Verilog (ADD/SUB/AND/OR/LOAD/STORE, 8 regs, 20-entry dmem) |
+| `tiny_cpu.json` | Yosys JSON netlist compiled from `tiny_cpu.v` via `proc; opt` passes |
+| `tiny-cpu.rkt` | Golden-model ISA interpreter for tiny_cpu; assembler helpers, `cpu-run` |
 | `examples.rkt` | Six worked examples demonstrating concrete + symbolic use |
 | `tests/test-suite.rkt` | `rackunit` test suite covering all examples |
+| `tests/test-tiny-cpu.rkt` | Concrete simulation tests for the ISA interpreter |
+| `tests/test-tiny-cpu-rtlil.rkt` | Cross-validation: ISA interpreter vs. Yosys JSON netlist |
 | `.github/workflows/test.yml` | GitHub Actions CI: installs Racket + Rosette, runs tests |
 
 ## Running Tests
 
 ```bash
 raco test tests/test-suite.rkt
+raco test tests/test-tiny-cpu.rkt
+raco test tests/test-tiny-cpu-rtlil.rkt
 ```
 
-The CI workflow runs on every push and pull request. It installs Racket 8.14 (CS, full distribution) and Rosette via `raco pkg install`, then runs the test suite. Racket packages are cached by version + file hash to speed up subsequent runs.
+The CI workflow runs on every push and pull request. It installs Racket 8.14 (CS, full distribution) and Rosette via `raco pkg install`, then runs all three test files. Racket packages are cached by version + file hash to speed up subsequent runs.
 
 ## Architecture
 
@@ -104,11 +112,35 @@ Six examples in `examples.rkt`:
 5. **Synthesis** — `solve` finds `A,B` satisfying `A - B = 42`
 6. **Counter safety** — `verify` proves a resettable counter equals 5 after reset + 5 steps, regardless of initial register state
 
+## Yosys JSON Format Notes
+
+`yosys-json.rkt` implements a bit-level evaluator for Yosys JSON output (simpler than text RTLIL).
+
+**Key format details:**
+- Wire bits are represented as unique integers (bit IDs); strings `"0"`/`"1"` are constant bits
+- Cell connections map port names → lists of bit IDs (LSB-first)
+- Parameters are 32-bit binary strings (MSB-first), parsed with `parse-param-str`
+- Boolean params (e.g., `A_SIGNED`) need explicit int→bool conversion; Racket 0 is truthy
+
+**Why bit-level (not wire-level):** The `$shiftx` cell (Verilog `A[B +: W]`) scatters its output bits directly to multiple named wires after optimization, so there is no single wire name for the result. A `hash[bit-id → (bitvector 1)]` environment handles this naturally.
+
+**`$shiftx` semantics:** Implemented via Racket integer arithmetic (`arithmetic-shift`). Symbolic support would require dynamic `extract` indices, which Rosette does not allow. Concrete-only.
+
+**`$sdff`/`$sdffe`:** Emitted by Yosys from `always @(posedge clk) if (rst)` blocks (synchronous reset). Handled in `eval-sequential`.
+
+**Output ports are required:** Yosys dead-code-eliminates all logic not reachable from output ports. A module with no outputs compiles to an `$abstract` module with 0 cells. Always add observable output assignments (`assign pc_out = pc; …`).
+
+**Regenerating `tiny_cpu.json`:**
+```bash
+yosys -q -p "read_verilog tiny_cpu.v; hierarchy -top tiny_cpu; proc; opt; write_json tiny_cpu.json"
+```
+
 ## Potential Extensions
 
 - **Memory cells**: `$mem`, `$mem_rd`, `$mem_wr` using Rosette arrays (`define-symbolic` over array type)
 - **RTLIL text parser**: parse `yosys -p "write_rtlil"` output into the data structures here
-- **JSON import**: parse `yosys -p "write_json"` output (easier than text RTLIL)
+- ~~**JSON import**: parse `yosys -p "write_json"` output~~ — **Done** (`yosys-json.rkt`)
 - **Bounded model checking**: loop `step-module` k times with symbolic inputs + state, assert invariants
 - **`$pow`**: exponentiation via repeated squaring (rarely emitted by synthesis)
 - **RTLIL processes**: case/switch blocks that appear before `proc` pass flattens them
+- **Symbolic `$shiftx`**: currently concrete-only; would need SMT array theory or bounded unrolling
