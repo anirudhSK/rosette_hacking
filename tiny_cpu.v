@@ -26,7 +26,15 @@
 module tiny_cpu (
     input             clk,
     input             rst,
-    input [1023:0]    imem    // 64 × 16-bit instruction words, packed
+    input [1023:0]    imem,   // 64 × 16-bit instruction words, packed
+    // Observable outputs (all architectural state)
+    output [5:0]  pc_out,
+    output [7:0]  r0_out, r1_out, r2_out, r3_out,
+                  r4_out, r5_out, r6_out, r7_out,
+    output [7:0]  dm0_out,  dm1_out,  dm2_out,  dm3_out,  dm4_out,
+                  dm5_out,  dm6_out,  dm7_out,  dm8_out,  dm9_out,
+                  dm10_out, dm11_out, dm12_out, dm13_out, dm14_out,
+                  dm15_out, dm16_out, dm17_out, dm18_out, dm19_out
 );
 
 // ── Opcodes ───────────────────────────────────────────────────────────────
@@ -145,5 +153,17 @@ always @(posedge clk) begin
         end
     end
 end
+
+// ── Observable output assignments ─────────────────────────────────────────
+assign pc_out  = pc;
+assign r0_out  = r0;  assign r1_out  = r1;  assign r2_out  = r2;  assign r3_out  = r3;
+assign r4_out  = r4;  assign r5_out  = r5;  assign r6_out  = r6;  assign r7_out  = r7;
+assign dm0_out  = dm0;  assign dm1_out  = dm1;  assign dm2_out  = dm2;
+assign dm3_out  = dm3;  assign dm4_out  = dm4;  assign dm5_out  = dm5;
+assign dm6_out  = dm6;  assign dm7_out  = dm7;  assign dm8_out  = dm8;
+assign dm9_out  = dm9;  assign dm10_out = dm10; assign dm11_out = dm11;
+assign dm12_out = dm12; assign dm13_out = dm13; assign dm14_out = dm14;
+assign dm15_out = dm15; assign dm16_out = dm16; assign dm17_out = dm17;
+assign dm18_out = dm18; assign dm19_out = dm19;
 
 endmodule
